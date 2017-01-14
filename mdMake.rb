@@ -18,7 +18,7 @@ if (ARGV.length == 0)
     banner += "\t\t(required) TARGETS=[debug|release|optdebug] (or any comma separated combination)\n"
     banner += "\t\t\tcontrols which targets to build\n"
     banner += "\t\t(optional) VERBOSE=yes\n"
-    banner += "\t\t\tspecifies verbose TTY output while building\n"
+    banner += "\t\t\tspecifies verbose output while building\n"
     banner += "\t\t(optional) clean\n"
     banner += "\t\t\tonly cleans project in current directory\n"
     banner += "\t\t(optional) cleandeps\n"
@@ -28,10 +28,10 @@ if (ARGV.length == 0)
     banner += "\t\t(optional) rebuild\n"
     banner += "\t\t\tdoes a cleanall followed by a build\n"
     banner += "\t\t(optional) extrainfo\n"
-    banner += "\t\t\tprints out extra debugging TTY related to the build system\n"
+    banner += "\t\t\tprints out extra debugging ouput related to the build system\n"
     banner += "\n"
     banner += "\tAnything that comes after the specials is passed verbatim to the make system and is interpreted by it.\n"
-    banner += "\tSee mdMake.common for which variable the make system uses\n"
+    banner += "\tSee mdMake.common for which variables the make system uses\n"
     banner += "\n"
 
     puts banner
