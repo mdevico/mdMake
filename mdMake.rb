@@ -27,7 +27,7 @@ if (ARGV.length == 0)
     banner += "\t\t\tcleans dependant projects and project in current directory\n"
     banner += "\t\t(optional) rebuild\n"
     banner += "\t\t\tdoes a cleanall followed by a build\n"
-    banner += "\t\t(optional) verbose\n"
+    banner += "\t\t(optional) extrainfo\n"
     banner += "\t\t\tprints out extra debugging TTY related to the build system\n"
     banner += "\n"
     banner += "\tAnything that comes after the specials is passed verbatim to the make system and is interpreted by it.\n"
@@ -379,7 +379,7 @@ end
 #
 # flag that controls TTY output of mdMake.rb itself
 #
-@verbose = false
+@extrainfo = false
 
 #
 # given the full path name of a build target, this returns just the name of the library/executable/etc...
@@ -606,7 +606,7 @@ def clean(dir, target)
     buildStr = "make --no-print-directory --directory=#{dir} -f mdMake TARGET=#{target} PROC_TYPE=#{@builds[projDir][Index::PROCTYPE]} LINK_SRC=#{linkSrc} LINK_DST=#{linkDst} clean" + @args
 
     # do the system call to "make"
-    if (@verbose == true) then puts buildStr end
+    if (@extrainfo == true) then puts buildStr end
     puts "----------------------------------------------------------------"
     puts "cleaning #{@builds[projDir][Index::PROCTYPE]} #{target} #{getSimpleBuildName(@builds[projDir][Index::OUTPUT])}".green
     puts "----------------------------------------------------------------"
@@ -624,7 +624,7 @@ def build(dir, deps, target)
     buildStr = "make --no-print-directory --directory=#{dir} -f mdMake TARGET=#{target} DEPENDENCIES=#{deps} PROC_TYPE=#{@builds[projDir][Index::PROCTYPE]} LINK_SRC=#{linkSrc} LINK_DST=#{linkDst}" + @args
 
     # do the system call to "make"
-    if (@verbose == true) then puts buildStr end
+    if (@extrainfo == true) then puts buildStr end
     puts "----------------------------------------------------------------"
     puts "building #{@builds[projDir][Index::PROCTYPE]} #{target} #{getSimpleBuildName(@builds[projDir][Index::OUTPUT])}".green
     puts "----------------------------------------------------------------"
@@ -656,8 +656,8 @@ def main()
                 @targets = targetsStr.split(",")
             end
 
-            if (a.to_s =~ /\bverbose\b/)
-                @verbose = true
+            if (a.to_s =~ /\bextrainfo\b/)
+                @extrainfo = true
             end
 
             if (a.to_s =~ /\bcleandeps\b/)
@@ -687,8 +687,8 @@ def main()
                 @targets = targetsStr.split(",")
             end
 
-            if (a.to_s =~ /\bverbose\b/)
-                @verbose = true
+            if (a.to_s =~ /\bextrainfo\b/)
+                @extrainfo = true
             end
 
             if (a.to_s =~ /\bcleandeps\b/)
@@ -726,8 +726,8 @@ def main()
     # remove TARGETS from @args (we no longer it, and we don't want to pass it on to the mdMake files)
     @args.gsub!(/\bTARGETS=[a-zA-Z,]+\s+/, "")
 
-    # remove verbose flag from @args
-    @args.gsub!(/\bverbose\b/, "")
+    # remove extrainfo flag from @args
+    @args.gsub!(/\bextrainfo\b/, "")
 
     if (rebuild == true)
         @targets.each do |target|
@@ -768,7 +768,7 @@ def main()
         # create dependency and build lists
         getDependencies(p, target)
 
-        if (@verbose == true)
+        if (@extrainfo == true)
             puts ""
             puts "deps: #{@deps}"
             puts ""
