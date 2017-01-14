@@ -3,8 +3,8 @@ ifneq ($(NAME),)
 
 SIMPLE_NAME = $(basename $(NAME))
 
-ifeq ($(CPP),)
-CPP				 := g++
+ifeq ($(CXX),)
+CXX				 := g++
 endif
 
 ifeq ($(CC),)
@@ -51,7 +51,7 @@ endif
 
 ifeq ($(PROC_TYPE),x86)
 
-CPP_FLAGS        += -m32
+CXX_FLAGS        += -m32
 C_FLAGS          += -m32
 LD_FLAGS         += -m32
 
@@ -89,44 +89,44 @@ LIBS              := $(foreach lib,$(WHOLE_LIBS),$(if $(suffix $(lib)),$(subst -
 endif
 
 C_FLAGS          += -Wall -Werror
-CPP_FLAGS        += -Wall -Werror
+CXX_FLAGS        += -Wall -Werror
 #LD_FLAGS         += -fno-use-linker-plugin
 
 # remove duplicate options
 #C_FLAGS          := $(sort $(C_FLAGS))
-#CPP_FLAGS        := $(sort $(CPP_FLAGS))
+#CXX_FLAGS        := $(sort $(CXX_FLAGS))
 
 C_FLAGS          += $(INCLUDES)
-CPP_FLAGS        += $(INCLUDES)
+CXX_FLAGS        += $(INCLUDES)
 
 AR_FLAGS         := -crs
 OUTPUT           := $(OUT_PATH)/$(NAME)
 EXC_FILES        := $(foreach srcdir,$(SRC_DIRS),$(addprefix $(srcdir)/,$(EXCLUDE_SRCS)))
-CPP_FILES        := $(wildcard $(addsuffix /*.cpp,$(SRC_DIRS)))
-CPP_FILES        := $(filter-out $(EXC_FILES),$(CPP_FILES))
+CXX_FILES        := $(wildcard $(addsuffix /*.cpp,$(SRC_DIRS)))
+CXX_FILES        := $(filter-out $(EXC_FILES),$(CXX_FILES))
 C_FILES          := $(wildcard $(addsuffix /*.c,$(SRC_DIRS)))
 C_FILES          := $(filter-out $(EXC_FILES),$(C_FILES))
-OBJ_FILES        := $(CPP_FILES:.cpp=.o) $(C_FILES:.c=.o)
+OBJ_FILES        := $(CXX_FILES:.cpp=.o) $(C_FILES:.c=.o)
 OBJS             := $(addprefix $(OBJ_DIR)/,$(notdir $(OBJ_FILES)))
 D_FILES          := $(OBJS:.o=.d)
 
-CPP_PATTERNS     := $(addsuffix /%.cpp,$(SRC_DIRS))
+CXX_PATTERNS     := $(addsuffix /%.cpp,$(SRC_DIRS))
 C_PATTERNS       := $(addsuffix /%.c,$(SRC_DIRS))
 
 ifeq ($(suffix $(NAME)),)
 
 ifneq ($(LD_FLAGS),)
-LINK             := $(CPP) $(LD_FLAGS) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+LINK             := $(CXX) $(LD_FLAGS) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
 else
-LINK             := $(CPP) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+LINK             := $(CXX) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
 endif
 
 else ifeq ($(suffix $(NAME)),.exe)
 
 ifneq ($(LD_FLAGS),)
-LINK             := $(CPP) $(LD_FLAGS) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+LINK             := $(CXX) $(LD_FLAGS) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
 else
-LINK             := $(CPP) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+LINK             := $(CXX) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
 endif
 
 else ifeq ($(suffix $(NAME)),.a)
@@ -136,9 +136,9 @@ LINK             := $(AR) $(AR_FLAGS) $(OUTPUT) $(OBJS)
 else ifeq ($(suffix $(NAME)),.so)
 
 ifeq ($(WHOLE_LIBS),)
-LINK             := $(CPP) -shared $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+LINK             := $(CXX) -shared $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
 else
-LINK             := $(CPP) -shared $(LIB_PATH) $(OBJS) $(LIBS) -Wl,--whole-archive $(WHOLE_LIBS) -Wl,--no-whole-archive -o $(OUTPUT)
+LINK             := $(CXX) -shared $(LIB_PATH) $(OBJS) $(LIBS) -Wl,--whole-archive $(WHOLE_LIBS) -Wl,--no-whole-archive -o $(OUTPUT)
 endif
 
 endif
@@ -154,12 +154,12 @@ endif
 define cpp_rule
 $(OBJ_DIR)/%.o: $(1)
 ifeq ($(VERBOSE),yes)
-	$(CPP) $(OPT) $(DEFINES) $(CPP_FLAGS) -c $$< -o $$@
+	$(CXX) $(OPT) $(DEFINES) $(CXX_FLAGS) -c $$< -o $$@
 else
 	@ echo "compiling" $$(notdir $$<)
-	@ $(CPP) $(OPT) $(DEFINES) $(CPP_FLAGS) -c $$< -o $$@
+	@ $(CXX) $(OPT) $(DEFINES) $(CXX_FLAGS) -c $$< -o $$@
 endif
-	@ $(CPP) -MM $(CPP_FLAGS) -Wp,-MD,$(OBJ_DIR)/$$*.d $$<
+	@ $(CXX) -MM $(CXX_FLAGS) -Wp,-MD,$(OBJ_DIR)/$$*.d $$<
 	@ mv -f $(OBJ_DIR)/$$*.d $(OBJ_DIR)/$$*.d.tmp
 	@ sed -e 's|.*:|$(OBJ_DIR)/$$*.o:|' < $(OBJ_DIR)/$$*.d.tmp > $(OBJ_DIR)/$$*.d
 	@ sed -e 's/.*://' -e 's/\\$$$$//' < $(OBJ_DIR)/$$*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$$$/:/' >> $(OBJ_DIR)/$$*.d
@@ -187,7 +187,7 @@ endef
 .PHONY: default
 default: compile link
 
-$(foreach pattern,$(CPP_PATTERNS),$(eval $(call cpp_rule,$(pattern))))
+$(foreach pattern,$(CXX_PATTERNS),$(eval $(call cpp_rule,$(pattern))))
 $(foreach pattern,$(C_PATTERNS),$(eval $(call c_rule,$(pattern))))
 
 -include $(D_FILES)
