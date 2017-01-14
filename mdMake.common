@@ -1,0 +1,277 @@
+# do nothing if the NAME variable is empty
+ifneq ($(NAME),)
+
+SIMPLE_NAME = $(basename $(NAME))
+
+ifeq ($(CPP),)
+CPP				 := g++
+endif
+
+ifeq ($(CC),)
+CC				 := gcc
+endif
+
+AR				 := ar
+
+ifeq ($(TARGET),debug)
+
+ifeq ($(OPT),)
+OPT              := -g -O0
+endif
+DEFINES          += -DDEBUG -D_DEBUG
+
+else ifeq ($(TARGET),release)
+
+ifeq ($(OPT),)
+OPT              := -O2
+endif
+DEFINES          += -DNDEBUG
+
+else ifeq ($(TARGET),optdebug)
+
+ifeq ($(OPT),)
+OPT              := -g -O2
+endif
+DEFINES          += -DDEBUG -D_DEBUG
+
+endif
+
+# remove duplicates
+DEFINES          := $(sort $(DEFINES))
+
+DEP_PATH         := $(dir $(DEPENDENCIES))
+LIBS_FROM_DEPS   := $(notdir $(DEPENDENCIES))
+LIBS_FROM_DEPS   := $(foreach lib,$(LIBS_FROM_DEPS),$(if $(suffix $(lib)),$(subst lib,,$(lib)),$(lib)))
+LIBS_FROM_DEPS   := $(addprefix -l,$(LIBS_FROM_DEPS))
+LIBS_FROM_DEPS   := $(LIBS_FROM_DEPS:.a=)
+
+ifeq ($(PROC_TYPE),)
+PROC_TYPE        := x64
+endif
+
+ifeq ($(PROC_TYPE),x86)
+
+CPP_FLAGS        += -m32
+C_FLAGS          += -m32
+LD_FLAGS         += -m32
+
+endif
+
+OBJ_DIR          := obj/$(TARGET)/$(PROC_TYPE)
+OUT_PATH         := $(OUT_DIR)/$(TARGET)/$(PROC_TYPE)
+
+INCLUDES         := $(addprefix -I,$(INCLUDES))
+LIB_PATH         := $(addprefix -L,$(LIB_PATH))
+ifneq ($(DEP_PATH),)
+LIB_PATH         += $(addprefix -L,$(DEP_PATH))
+endif
+
+ifeq ($(suffix $(NAME)),)
+
+LIBS              := $(LIBS_FROM_DEPS) $(addprefix -l,$(LIBS))
+LIBS              := $(foreach lib,$(LIBS),$(if $(suffix $(lib)),$(subst -l,,$(lib)),$(lib)))
+
+else ifeq ($(suffix $(NAME)),.exe)
+
+LIBS              := $(LIBS_FROM_DEPS) $(addprefix -l,$(LIBS))
+LIBS              := $(foreach lib,$(LIBS),$(if $(suffix $(lib)),$(subst -l,,$(lib)),$(lib)))
+
+else ifeq ($(suffix $(NAME)),.a)
+
+LIBS              := $(LIBS_FROM_DEPS) $(addprefix -l,$(LIBS))
+LIBS              := $(foreach lib,$(LIBS),$(if $(suffix $(lib)),$(subst -l,,$(lib)),$(lib)))
+
+else
+
+WHOLE_LIBS        := $(addprefix -l,$(WHOLE_LIBS))
+LIBS              := $(foreach lib,$(WHOLE_LIBS),$(if $(suffix $(lib)),$(subst -l,,$(lib)),$(lib)))
+
+endif
+
+C_FLAGS          += -Wall -Werror
+CPP_FLAGS        += -Wall -Werror
+#LD_FLAGS         += -fno-use-linker-plugin
+
+# remove duplicate options
+#C_FLAGS          := $(sort $(C_FLAGS))
+#CPP_FLAGS        := $(sort $(CPP_FLAGS))
+
+C_FLAGS          += $(INCLUDES)
+CPP_FLAGS        += $(INCLUDES)
+
+AR_FLAGS         := -crs
+OUTPUT           := $(OUT_PATH)/$(NAME)
+EXC_FILES        := $(foreach srcdir,$(SRC_DIRS),$(addprefix $(srcdir)/,$(EXCLUDE_SRCS)))
+CPP_FILES        := $(wildcard $(addsuffix /*.cpp,$(SRC_DIRS)))
+CPP_FILES        := $(filter-out $(EXC_FILES),$(CPP_FILES))
+C_FILES          := $(wildcard $(addsuffix /*.c,$(SRC_DIRS)))
+C_FILES          := $(filter-out $(EXC_FILES),$(C_FILES))
+OBJ_FILES        := $(CPP_FILES:.cpp=.o) $(C_FILES:.c=.o)
+OBJS             := $(addprefix $(OBJ_DIR)/,$(notdir $(OBJ_FILES)))
+D_FILES          := $(OBJS:.o=.d)
+
+CPP_PATTERNS     := $(addsuffix /%.cpp,$(SRC_DIRS))
+C_PATTERNS       := $(addsuffix /%.c,$(SRC_DIRS))
+
+ifeq ($(suffix $(NAME)),)
+
+ifneq ($(LD_FLAGS),)
+LINK             := $(CPP) $(LD_FLAGS) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+else
+LINK             := $(CPP) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+endif
+
+else ifeq ($(suffix $(NAME)),.exe)
+
+ifneq ($(LD_FLAGS),)
+LINK             := $(CPP) $(LD_FLAGS) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+else
+LINK             := $(CPP) $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+endif
+
+else ifeq ($(suffix $(NAME)),.a)
+
+LINK             := $(AR) $(AR_FLAGS) $(OUTPUT) $(OBJS)
+
+else ifeq ($(suffix $(NAME)),.so)
+
+ifeq ($(WHOLE_LIBS),)
+LINK             := $(CPP) -shared $(LIB_PATH) $(OBJS) $(LIBS) -o $(OUTPUT)
+else
+LINK             := $(CPP) -shared $(LIB_PATH) $(OBJS) $(LIBS) -Wl,--whole-archive $(WHOLE_LIBS) -Wl,--no-whole-archive -o $(OUTPUT)
+endif
+
+endif
+
+
+ifeq ($(VERBOSE),yes)
+VB              := 
+else
+VB              := @
+endif
+
+
+define cpp_rule
+$(OBJ_DIR)/%.o: $(1)
+ifeq ($(VERBOSE),yes)
+	$(CPP) $(OPT) $(DEFINES) $(CPP_FLAGS) -c $$< -o $$@
+else
+	@ echo "compiling" $$(notdir $$<)
+	@ $(CPP) $(OPT) $(DEFINES) $(CPP_FLAGS) -c $$< -o $$@
+endif
+	@ $(CPP) -MM $(CPP_FLAGS) -Wp,-MD,$(OBJ_DIR)/$$*.d $$<
+	@ mv -f $(OBJ_DIR)/$$*.d $(OBJ_DIR)/$$*.d.tmp
+	@ sed -e 's|.*:|$(OBJ_DIR)/$$*.o:|' < $(OBJ_DIR)/$$*.d.tmp > $(OBJ_DIR)/$$*.d
+	@ sed -e 's/.*://' -e 's/\\$$$$//' < $(OBJ_DIR)/$$*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$$$/:/' >> $(OBJ_DIR)/$$*.d
+	@ rm -f $(OBJ_DIR)/$$*.d.tmp
+
+endef
+
+define c_rule
+$(OBJ_DIR)/%.o: $(1)
+ifeq ($(VERBOSE),yes)
+	$(CC) $(OPT) $(DEFINES) $(C_FLAGS) -c $$< -o $$@
+else
+	@ echo "compiling" $$(notdir $$<)
+	@ $(CC) $(OPT) $(DEFINES) $(C_FLAGS) -c $$< -o $$@
+endif
+	@ $(CC) -MM $(C_FLAGS) -Wp,-MD,$(OBJ_DIR)/$$*.d $$<
+	@ mv -f $(OBJ_DIR)/$$*.d $(OBJ_DIR)/$$*.d.tmp
+	@ sed -e 's|.*:|$(OBJ_DIR)/$$*.o:|' < $(OBJ_DIR)/$$*.d.tmp > $(OBJ_DIR)/$$*.d
+	@ sed -e 's/.*://' -e 's/\\$$$$//' < $(OBJ_DIR)/$$*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$$$/:/' >> $(OBJ_DIR)/$$*.d
+	@ rm -f $(OBJ_DIR)/$$*.d.tmp
+
+endef
+
+
+.PHONY: default
+default: compile link
+
+$(foreach pattern,$(CPP_PATTERNS),$(eval $(call cpp_rule,$(pattern))))
+$(foreach pattern,$(C_PATTERNS),$(eval $(call c_rule,$(pattern))))
+
+-include $(D_FILES)
+
+.PHONY: compile
+compile: $(OBJ_DIR) $(OBJS)
+
+.PHONY: link
+link: $(OUTPUT)
+	@ echo ""
+	@ echo ""
+
+$(OBJ_DIR):
+	$(VB) mkdir -p $(OBJ_DIR)
+
+$(OUT_PATH):
+	$(VB) mkdir -p $(OUT_PATH)
+
+$(OUTPUT): $(OBJ_DIR) $(OUT_PATH) $(OBJS) $(DEPENDENCIES)
+ifeq ($(VERBOSE),yes)
+	@ echo ""
+	$(LINK)
+ifneq ($(LINK_SRC),)
+ifneq ($(LINK_DST),)
+	@ echo ""
+	if [ -h $(LINK_DST)$(SIMPLE_NAME)_$(TARGET) ]; then unlink $(LINK_DST)$(SIMPLE_NAME)_$(TARGET); fi
+	ln -s $(LINK_SRC) $(LINK_DST)$(SIMPLE_NAME)_$(TARGET)
+endif
+endif
+else
+	@ echo ""
+	@ echo "linking" $(notdir $(OUTPUT))
+	@ $(LINK)
+ifneq ($(LINK_SRC),)
+ifneq ($(LINK_DST),)
+	@ if [ -h $(LINK_DST)$(SIMPLE_NAME)_$(TARGET) ]; then unlink $(LINK_DST)$(SIMPLE_NAME)_$(TARGET); fi
+	@ ln -s $(LINK_SRC) $(LINK_DST)$(SIMPLE_NAME)_$(TARGET)
+endif
+endif
+endif
+
+.PHONY: clean
+clean:
+ifeq ($(VERBOSE),yes)
+	if [ -e $(OUTPUT) ]; then rm -rf $(OUTPUT); fi;
+	@ echo ""
+	rm -rf $(OBJS)
+	@ echo ""
+	rm -rf $(D_FILES)
+	@ echo ""
+ifneq ($(LINK_SRC),)
+ifneq ($(LINK_DST),)
+	if [ -h $(LINK_DST)$(SIMPLE_NAME)_$(TARGET) ]; then unlink $(LINK_DST)$(SIMPLE_NAME)_$(TARGET); fi
+	@ echo ""
+endif
+endif
+	@ echo ""
+else
+	@ echo "removing library"
+	@ if [ -e $(OUTPUT) ]; then rm -rf $(OUTPUT); fi;
+	@ echo "removing object files"
+	@ rm -rf $(OBJS)
+	@ echo "removing dependency files"
+	@ rm -rf $(D_FILES)
+ifneq ($(LINK_SRC),)
+ifneq ($(LINK_DST),)
+	@ echo "removing link"
+	@ if [ -h $(LINK_DST)$(SIMPLE_NAME)_$(TARGET) ]; then unlink $(LINK_DST)$(SIMPLE_NAME)_$(TARGET); fi
+endif
+endif
+	@ echo ""
+	@ echo ""
+endif
+
+# top level ifneq ($(NAME),)
+else
+
+# suppress default tty
+.PHONY: default
+default:
+	@ echo > /dev/null
+
+.PHONY: clean
+clean:
+	@ echo > /dev/null
+
+endif
