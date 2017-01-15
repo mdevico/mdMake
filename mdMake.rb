@@ -5,7 +5,6 @@ module Index
     OUTDIR = 1
     OUTPUT = 2
     LINKDST = 3
-    PROCTYPE = 4
 end
 
 if (ARGV.length == 0)
@@ -393,15 +392,11 @@ def getSimpleBuildName(fullName)
     return fullName[(index +1 )..-1]
 end
 
-def isExecutable(name)
-    return (name != "" && ((name =~ /\.exe/) != nil || name !~ /\./))
-end
-
 #
 # "visits" the supplied path by parsing its Makefile for several values and storing the results inside
 # of the @deps list.  it returns the dependencies of the Makefile as well as its output file (including path).
 #
-def visitPath(path, target, parentName, parentProcType)
+def visitPath(path, target, parentName)
     # find this Makefile's dependencies
     deps = getMakeListVariable(path, "DEPENDENCIES", true)
     # find this Makefile's project name (the name of the file it will output)
@@ -412,14 +407,6 @@ def visitPath(path, target, parentName, parentProcType)
     outDir = ""
     od = getMakeListVariable(path, "OUT_DIR", true)
     if (od != nil) then outDir = od[0].to_s end
-    # find this Makefile's proc type; only inherit parent proc type if we are not an executable
-    procType = ""
-    if (isExecutable(name) == true || isExecutable(parentName) == false || parentProcType == "")
-        pt = getMakeListVariable(path, "PROC_TYPE", false)
-        if (pt != nil) then procType = pt[0].to_s else procType="x64" end
-    else
-        procType = parentProcType
-    end
     # find this Makefile's link output directory
     linkDst = ""
     ld = getMakeListVariable(path, "OUTPUT_LINK", true)
@@ -433,12 +420,12 @@ def visitPath(path, target, parentName, parentProcType)
 
     # construct the output's path with filename
     if (name != nil && outDir != nil)
-        output = "#{target}/#{procType}/#{name}"
+        output = "#{target}/#{name}"
     end
 
     if (deps == nil)
         @deps[path.to_s] = []
-        return nil,outDir,output,linkDst,procType
+        return nil,outDir,output,linkDst
     end
 
     adjustedDeps = []
@@ -455,7 +442,7 @@ def visitPath(path, target, parentName, parentProcType)
     # store the dependencies
     @deps[path.to_s] = adjustedDeps
 
-    return adjustedDeps,outDir,output,linkDst,procType
+    return adjustedDeps,outDir,output,linkDst
 end
 
 #
@@ -473,10 +460,6 @@ def getDependencies(path, target)
     parentName = ""
     n = getMakeListVariable(path, "NAME", false)
     if (n != nil) then parentName = n[0].to_s end
-    # find this Makefile's proc type
-    parentProcType = ""
-    pt = getMakeListVariable(path, "PROC_TYPE", false)
-    if (pt != nil) then parentProcType = pt[0].to_s else parentProcType="x64" end
 
     # loop that performs the breadth first search
     while (dirs.empty? == false)
@@ -488,10 +471,10 @@ def getDependencies(path, target)
             # construct a new path based on the current dir
             p = Path.new(dir)
             # visit the new path to build its dependency list and output
-            deps,outDir,output,linkDst,procType = visitPath(p, target, parentName, parentProcType)
+            deps,outDir,output,linkDst = visitPath(p, target, parentName)
 
             # add it to the build list
-            @builds[dir] = [false, outDir, output, linkDst, procType]
+            @builds[dir] = [false, outDir, output, linkDst]
 
             # if this project has dependencies, then add those as well
             if (deps != nil)
@@ -501,12 +484,7 @@ def getDependencies(path, target)
                     # don't include a project more than once in the build list
                     if (dirs.include?(d) == false)
                         dirs << d
-                        # dependencies inherit the proc type of their parent if the parent is an executable
-                        if (isExecutable(output) == true)
-                            @builds[d] = [false, "", "", "", procType]
-                        else
-                            @builds[d] = [false, "", "", "", ""]
-                        end
+                        @builds[d] = [false, "", "", ""]
                     end
                 end
             end
@@ -603,12 +581,12 @@ def clean(dir, target)
     linkSrc,linkDst = getLinkSrcAndDst(projDir, target)
 
     # construct make command
-    buildStr = "make --no-print-directory --directory=#{dir} -f mdMake TARGET=#{target} PROC_TYPE=#{@builds[projDir][Index::PROCTYPE]} LINK_SRC=#{linkSrc} LINK_DST=#{linkDst} clean" + @args
+    buildStr = "make --no-print-directory --directory=#{dir} -f mdMake TARGET=#{target} LINK_SRC=#{linkSrc} LINK_DST=#{linkDst} clean" + @args
 
     # do the system call to "make"
     if (@extrainfo == true) then puts buildStr end
     puts "----------------------------------------------------------------"
-    puts "cleaning #{@builds[projDir][Index::PROCTYPE]} #{target} #{getSimpleBuildName(@builds[projDir][Index::OUTPUT])}".green
+    puts "cleaning #{target} #{getSimpleBuildName(@builds[projDir][Index::OUTPUT])}".green
     puts "----------------------------------------------------------------"
     if (system("#{buildStr}") == false) then exit 1 end
 end
@@ -621,12 +599,12 @@ def build(dir, deps, target)
     linkSrc,linkDst = getLinkSrcAndDst(projDir, target)
 
     # construct make command
-    buildStr = "make --no-print-directory --directory=#{dir} -f mdMake TARGET=#{target} DEPENDENCIES=#{deps} PROC_TYPE=#{@builds[projDir][Index::PROCTYPE]} LINK_SRC=#{linkSrc} LINK_DST=#{linkDst}" + @args
+    buildStr = "make --no-print-directory --directory=#{dir} -f mdMake TARGET=#{target} DEPENDENCIES=#{deps} LINK_SRC=#{linkSrc} LINK_DST=#{linkDst}" + @args
 
     # do the system call to "make"
     if (@extrainfo == true) then puts buildStr end
     puts "----------------------------------------------------------------"
-    puts "building #{@builds[projDir][Index::PROCTYPE]} #{target} #{getSimpleBuildName(@builds[projDir][Index::OUTPUT])}".green
+    puts "building #{target} #{getSimpleBuildName(@builds[projDir][Index::OUTPUT])}".green
     puts "----------------------------------------------------------------"
     if (system("#{buildStr}") == false) then exit 1 end
 

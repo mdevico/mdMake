@@ -45,20 +45,8 @@ LIBS_FROM_DEPS   := $(foreach lib,$(LIBS_FROM_DEPS),$(if $(suffix $(lib)),$(subs
 LIBS_FROM_DEPS   := $(addprefix -l,$(LIBS_FROM_DEPS))
 LIBS_FROM_DEPS   := $(LIBS_FROM_DEPS:.a=)
 
-ifeq ($(PROC_TYPE),)
-PROC_TYPE        := x64
-endif
-
-ifeq ($(PROC_TYPE),x86)
-
-CXX_FLAGS        += -m32
-C_FLAGS          += -m32
-LD_FLAGS         += -m32
-
-endif
-
-OBJ_DIR          := obj/$(TARGET)/$(PROC_TYPE)
-OUT_PATH         := $(OUT_DIR)/$(TARGET)/$(PROC_TYPE)
+OBJ_DIR          := obj/$(TARGET)
+OUT_PATH         := $(OUT_DIR)/$(TARGET)
 
 INCLUDES         := $(addprefix -I,$(INCLUDES))
 LIB_PATH         := $(addprefix -L,$(LIB_PATH))
