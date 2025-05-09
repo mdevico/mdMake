@@ -28,6 +28,8 @@ if (ARGV.length == 0)
     banner += "\t\t\tdoes a cleanall followed by a build\n"
     banner += "\t\t(optional) extrainfo\n"
     banner += "\t\t\tprints out extra debugging ouput related to the build system\n"
+    banner += "\t\t(optional) generateClangdConfig\n"
+    banner += "\t\t\tregenerates clangd compile_commands.json file\n"
     banner += "\n"
     banner += "\tAnything that comes after the specials is passed verbatim to the make system and is interpreted by it.\n"
     banner += "\tSee mdMake.common for which variables the make system uses\n"
@@ -381,6 +383,11 @@ end
 @extrainfo = false
 
 #
+# flag that controls building of compile_commands.json
+#
+@generateClangdConfig = false
+
+#
 # given the full path name of a build target, this returns just the name of the library/executable/etc...
 #
 def getSimpleBuildName(fullName)
@@ -598,8 +605,16 @@ def build(dir, deps, target)
     projDir = dir.to_s
     linkSrc,linkDst = getLinkSrcAndDst(projDir, target)
 
+    if (@generateClangdConfig == true) then
+      clean(dir, target)
+    end
+
     # construct make command
     buildStr = "make --no-print-directory --directory=#{dir} -f mdMake TARGET=#{target} DEPENDENCIES=#{deps} LINK_SRC=#{linkSrc} LINK_DST=#{linkDst}" + @args
+
+    if (@generateClangdConfig == true) then
+      buildStr = "bear -- " + buildStr
+    end
 
     # do the system call to "make"
     if (@extrainfo == true) then puts buildStr end
@@ -638,6 +653,10 @@ def main()
                 @extrainfo = true
             end
 
+            if (a.to_s =~ /\bgenerateClangdConfig\b/)
+                @generateClangdConfig = true
+            end
+
             if (a.to_s =~ /\bcleandeps\b/)
                 cleandeps = true
                 @args.gsub!(/\bcleandeps\b/, "")
@@ -667,6 +686,10 @@ def main()
 
             if (a.to_s =~ /\bextrainfo\b/)
                 @extrainfo = true
+            end
+
+            if (a.to_s =~ /\bgenerateClangdConfig\b/)
+                @generateClangdConfig = true
             end
 
             if (a.to_s =~ /\bcleandeps\b/)
@@ -706,6 +729,9 @@ def main()
 
     # remove extrainfo flag from @args
     @args.gsub!(/\bextrainfo\b/, "")
+
+    # remove generateClangdConfig flag from @args
+    @args.gsub!(/\bgenerateClangdConfig\b/, "")
 
     if (rebuild == true)
         @targets.each do |target|
